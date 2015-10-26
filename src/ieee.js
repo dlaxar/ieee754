@@ -215,9 +215,6 @@
                     mantissaImplicit.unshift(0);
                 }
 
-                // todo emin-1 is passed as exponent although, the acutal value to compute (especially calculations) with is emin. check if this works!
-
-
                 return BinaryFloatNumber.createByRounding(system, sign, mantissaImplicit, exp);
 
             } else {
