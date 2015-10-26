@@ -1,5 +1,12 @@
 (function(module) {
 
+    /**
+     * Enables filtered logging. The filter level is bound by `this`
+     *
+     * @param obj
+     * @param level
+     * @constructor
+     */
     var Logger = function(obj, level) {
         if(level) {
             if(level > this) {
@@ -17,6 +24,17 @@
 
     var log;
 
+    /**
+     * This is a binary float system mathing the IEEE 754 specification
+     * (with different bitwidths).
+     *
+     * @param p
+     * @param eMin
+     * @param eMax
+     * @param denorm
+     * @param options
+     * @constructor
+     */
     function BinaryFloatSystem(p, eMin, eMax, denorm, options) {
         this.p = p;
         this.eMin = eMin;
@@ -38,6 +56,9 @@
         this.compute();
     }
 
+    /**
+     * Compute the parameters for the system. Intended for internal use
+     */
     BinaryFloatSystem.prototype.compute = function() {
         var exponentRange = this.eMax - this.eMin + 1 /*zero*/ + 1 /* infinity */;
         if(this.denorm) {
@@ -60,9 +81,11 @@
     };
 
     /**
+     * Converts a number in a base that is a power of two into the system
      *
      * @param {String} number
      * @param {Number} base
+     * @returns {BinaryFloatNumber}
      */
     BinaryFloatSystem.prototype.convert = function(number, base) {
         log('Converting number from base ' + base, Logger.DEBUG);
@@ -161,14 +184,33 @@
         }
     };
 
+    /**
+     * Converts a decimal number into excess representation
+     *
+     * @param {Number} decimal
+     * @returns {Number}
+     */
     BinaryFloatSystem.prototype.excessify = function(decimal) {
         return this.k + decimal;
     };
 
+    /**
+     * Converts a decimal excess representation into a normal decimal representation
+     *
+     * @param {Number} decimal
+     * @returns {number}
+     */
     BinaryFloatSystem.prototype.dexcessify = function(decimal) {
         return decimal - this.k;
     };
 
+    /**
+     * Converts any decimal integer to binary with a given width
+     *
+     * @param {Number} decimal
+     * @param {Number} width
+     * @returns {string} the binary representation
+     */
     BinaryFloatSystem.intToBinary = function(decimal, width) {
         var memo = new Array(width);
         memo.fill(0);
@@ -179,6 +221,13 @@
         return memo.join('');
     };
 
+    /**
+     * Utility function to compare two systems. Systems are considered equal if p, eMin, eMax and denorm
+     * are equal
+     *
+     * @param bfs
+     * @returns {boolean}
+     */
     BinaryFloatSystem.prototype.equals = function(bfs) {
         if(bfs instanceof BinaryFloatSystem) {
             return this.p == bfs.p && this.eMax == bfs.eMax && this.eMin == bfs.eMin && this.denorm == bfs.denorm;
@@ -187,6 +236,17 @@
     };
 
 
+    /**
+     * This is a float number represented in the IEEE 754 compatible system.
+     * It uses round to nearest utilizing 3 guard bits
+     * (GRS) and uses round-away-from-zero for tie cases.
+     *
+     * @param {BinaryFloatSystem} system
+     * @param {Number} sign
+     * @param {Number[]} mantissa - implicit!
+     * @param {Number} exponent - not in excess representation!
+     * @constructor
+     */
     function BinaryFloatNumber(system, sign, mantissa, exponent) {
         this.system = system;
         this.sign = sign;
@@ -194,6 +254,14 @@
         this.exponent = exponent;
     }
 
+    /**
+     * Creates and returns a BinaryFloatNumber by it's IEEE 754 array representation as it
+     * would be returned by .toArray()
+     *
+     * @param {BinaryFloatSystem} system
+     * @param {Number[]} a
+     * @returns {BinaryFloatNumber}
+     */
     BinaryFloatNumber.createByArray = function(system, a) {
         var sign = a[0];
         var exp = system.dexcessify(parseInt(a.slice(1, system.structure.exponent+1).join(''), 2));
@@ -202,6 +270,20 @@
         return new BinaryFloatNumber(system, sign, mantissa, exp);
     };
 
+    /**
+     * Creates and returns a BinaryFloatNumber using an explicit mantissa
+     * by rounding after checking for edgecases:
+     *
+     * <ul>
+     *     <li>exponent too big -> inifinity (sign aware)</li>
+     *     <li>exponent too small -> if denorm is allowed try to denorm, return IEEE 754 0 otherwise</li>
+     * </ul>
+     *
+     * @param {BinaryFloatSystem} system
+     * @param {Number} sign
+     * @param {Number[]} explicitMantissa - this is an explicit mantissa!
+     * @param {Number} exponent - not in excess representation!
+     */
     BinaryFloatNumber.createByRoundingWithChecks = function(system, sign, explicitMantissa, exponent) {
         if (exponent > system.eMax) {
             return BinaryFloatNumber.getInfinity(system, sign);
@@ -226,6 +308,16 @@
         }
     };
 
+    /**
+     * Creates and returns a BinaryFloatNumber using an implicit mantissa by rounding and
+     * assuming that there are no edgecases.
+     *
+     * @param {BinaryFloatSystem} system
+     * @param {Number} sign
+     * @param {String[]} mantissa - this mantissa is implicit. Strings are allowed as long as they parse to 1/0
+     * @param {Number} exponent
+     * @returns {BinaryFloatNumber}
+     */
     BinaryFloatNumber.createByRounding = function(system, sign, mantissa, exponent) {
         mantissa = mantissa.map(function(x) {
             return parseInt(x);
@@ -244,6 +336,7 @@
             var round = (mantissa.length < system.structure.mantissa + 1) ? mantissa[system.structure.mantissa + 1] : 0;
             var sticky = mantissa.lastIndexOf(1) > system.structure.mantissa+2;
 
+            // todo make rounding modular
             if(guard == 1) {
                 var carry = 0;
                 if(round == 1 || sticky) {
@@ -280,12 +373,26 @@
         return new BinaryFloatNumber(system, sign, finalMantissa, exponent);
     };
 
+    /**
+     * Returns an IEEE 754 zero matching system
+     *
+     * @param {BinaryFloatSystem} system
+     * @param {Number} sign
+     * @returns {BinaryFloatNumber}
+     */
     BinaryFloatNumber.getZero = function(system, sign) {
         var mantissa = new Array(system.structure.mantissa);
         mantissa.fill(0);
         return new BinaryFloatNumber(system, sign, mantissa, system.eMin - 1);
     };
 
+    /**
+     * Returns an IEEE 754 Infinity matching system
+     *
+     * @param {BinaryFloatSystem} system
+     * @param {Number} sign
+     * @returns {BinaryFloatNumber}
+     */
     BinaryFloatNumber.getInfinity = function(system, sign) {
         var mantissa = new Array(system.structure.mantissa);
         mantissa.fill(0);
@@ -300,6 +407,11 @@
         return Math.max(this.system.eMin, this.exponent);
     };
 
+    /**
+     * Returns the implicit bit
+     *
+     * @returns {number}
+     */
     BinaryFloatNumber.prototype.getImplicitBit = function() {
         return (this.exponent >= this.system.eMin) ? 1 : 0;
     };
@@ -522,6 +634,21 @@
         return BinaryFloatNumber.createByRoundingWithChecks(this.system, sign, result, resultExp);
     };
 
+    /**
+     * This function is intended for internal use only. It is used to prepare two numbers a and b for
+     * arithmetic logic like adding and subtracting. It is assumend, that a and b are both BinaryFloatNumbers and
+     * that they are in the same system.
+     *
+     * Note that this function does not alter the original numbers but instead returns (modified) copies.
+     *
+     * The function adapts the exponents of a and b (by shrinking the bigger exponent to match the smaller
+     * one and adding the according bits to the mantissa).
+     *
+     * @param {BinaryFloatNumber} a
+     * @param {BinaryFloatNumber} b
+     * @returns {[{Array}, {Boolean}, {Array}, {Boolean}]} Returns explicit mantissa of a and sticky bit as first two
+     * parameters, explicit mantissa and sticky bit of b as second two
+     */
     BinaryFloatNumber.prepareArithmetics = function(a, b) {
         var deltaExp = a.getExponent() - b.getExponent();
 
@@ -584,17 +711,31 @@
     };
 
     /**
+     * Returns a copy of the current number but absolute (sign flag not set)
      *
-     * @returns {BinaryFloatNumber} number
+     * @returns {BinaryFloatNumber}
      */
     BinaryFloatNumber.prototype.abs = function() {
         return new BinaryFloatNumber(this.system, 0, this.mantissa, this.exponent);
     };
 
+    /**
+     * Returns a copy of the current number but a negative (sign flag set)
+     *
+     * @returns {BinaryFloatNumber}
+     */
     BinaryFloatNumber.prototype.negation = function() {
         return new BinaryFloatNumber(this.system, this.sign == 1 ? 0 : 1, this.mantissa, this.exponent);
     };
 
+    /**
+     * Checks if two numbers are equal
+     *
+     * Two numbers are considered equal if sign, exponent and mantissa are equal
+     *
+     * @param b
+     * @returns {boolean}
+     */
     BinaryFloatNumber.prototype.equals = function(b) {
         if(!(b instanceof  BinaryFloatNumber) || !this.system.equals(b.system)) {
             throw "Parameter is not compatible with equals";
@@ -603,10 +744,22 @@
         return this.sign == b.sign && this.exponent == b.exponent && this.mantissa.join('') == b.mantissa.join('');
     };
 
+    /**
+     * Converts the data into a string representation matching the system. It would look like this:
+     * [sign] [exp] [mantissa]
+     *
+     * @returns {string}
+     */
     BinaryFloatNumber.prototype.toString = function() {
         return this.sign + ' ' + BinaryFloatSystem.intToBinary(this.system.excessify(this.exponent), this.system.structure.exponent) + ' ' + this.mantissa.join('');
     };
 
+    /**
+     * Returns a binary string representation of the number
+     *
+     * @param {bool} plus weather or not to display a positive sign
+     * @returns {string}
+     */
     BinaryFloatNumber.prototype.toFixed = function(plus) {
         var mantissa = this.mantissa.slice(0, this.mantissa.lastIndexOf(1)+1);
         var i, exponent = this.getExponent();
@@ -637,6 +790,12 @@
         return (this.sign == 1 ? '-' : plus ? '+' : '') + mantissa.join('');
     };
 
+    /**
+     * Returns an Array representation of the number matching the string representation given by toString()
+     * but as array and without whitespace characters
+     *
+     * @returns {Array}
+     */
     BinaryFloatNumber.prototype.toArray = function() {
         return this.toString().split('').filter(function(i) {
             return i != ' ';
