@@ -16,6 +16,10 @@
             margin-bottom: 60px;
         }
 
+        .operator {
+            font-size: 200%;;
+        }
+
         .number {
             font-size: 200%;
             width: 45%;
@@ -61,10 +65,10 @@
         }
 
         .number .structure .bit.one:after {
-            content: '1';
+            /*content: '1';*/
         }
         .number .structure .bit.zero:after {
-            content: '0';
+            /*content: '0';*/
         }
 
 
@@ -83,13 +87,14 @@
 <section class="number" id="a">
     <form id="form-a">
         <label for="a-base-exp">Exponent for A:</label>2<sup><input type="number" min="1" value="1" id="a-base-exp"></sup><br>
-        <label for="a-fixed">A:</label>(<input type="text" id="a-fixed" value="0">) <sub><span id="a-base-output"></span></sub>
+        <label for="a-fixed">Fixed-Point A:</label>(<input type="text" id="a-fixed" value="0">)<sub><span id="a-base-output"></span></sub>
     </form>
 
-    <div id="a-structure" class="structure"></div>
+    <p>IEEE 754 A: </p><div id="a-structure" class="structure input"></div>
 </section>
 
 <section class="operator" id="operator">
+    <p>⊞</p>
     <form action="form-op">
         <select name="opcode" id="op">
             <option value="+">PLUS</option>
@@ -103,14 +108,16 @@
 <section class="number" id="b">
     <form id="form-b">
         <label for="b-base-exp">Exponent for B:</label>2<sup><input type="number" min="1" value="1" id="b-base-exp"></sup><br>
-        <label for="b-fixed">B:</label>(<input type="text" id="b-fixed" value="0">) <sub><span id="b-base-output"></span></sub>
+        <label for="b-fixed">Fixed-Point B:</label>(<input type="text" id="b-fixed" value="0">)<sub><span id="b-base-output"></span></sub>
     </form>
 
-    <div id="b-structure" class="structure"></div>
+    <p>IEEE 754 B: </p>
+    <div id="b-structure" class="structure input"></div>
 </section>
 
 <section class="number wide" id="result">
 
+    <p>IEEE 754: A ⊞ B:</p>
     <div id="result-structure" class="structure"></div>
 </section>
 
@@ -161,17 +168,50 @@
         if(t) {
             clearTimeout(t);
         }
-        t = setTimeout(recalculate, 200);
+        t = setTimeout(reparse, 200);
     };
 
-    document.getElementById('form-system').onchange = recalculate;
+    document.getElementById('form-system').onchange = reparse;
+
+    var structures = document.querySelectorAll('.structure.input');
+    for(var i = 0; i < structures.length; i++) {
+        structures.item(i).onclick = setBit;
+    }
 
     var numbersContainers = document.getElementsByClassName('number');
     for(var i = 0; i < numbersContainers.length; i++) {
-        numbersContainers.item(i).onkeyup = recalculate;
+        numbersContainers.item(i).onkeyup = reparse;
     }
 
-    function recalculate() {
+    document.getElementById('op').onchange = reparse;
+
+    function setBit(event) {
+        var $bit = event.target;
+        var bitIndex = event.target.getAttribute('data-bit');
+        var variableName = event.target.parentNode.parentNode.id;
+
+        /** @var {BinaryFloatNumber} variable */
+        var variable = variableName == 'a' ? a : b;
+
+        var bits =  variable.toArray();
+        bits[bitIndex] = bits[bitIndex] == 1 ? 0 : 1;
+
+        if(variableName == 'a') {
+            a = window.BinaryFloatNumber.createByArray(F, bits);
+        } else {
+            b = window.BinaryFloatNumber.createByArray(F, bits);
+        }
+
+        document.getElementById(variableName + '-base-exp').value = 1;
+        document.getElementById(variableName + '-fixed').value = (variableName == 'a' ? a : b).toFixed();
+
+        fillStructure(variable, variableName);
+        recalculate();
+
+    }
+
+    var F, a, b, op;
+    function reparse() {
         clearTimeout(t);
         var p = parseInt(document.getElementById('p').value);
         if(isNaN(p) || p < 1) {
@@ -190,7 +230,7 @@
 
         var denorm = document.getElementById('denorm').value == 'true';
 
-        var F = new window.BinaryFloatSystem(p, emin, emax, denorm, {
+        F = new window.BinaryFloatSystem(p, emin, emax, denorm, {
             logLevel: Logger.DEBUG // todo UI
         });
 
@@ -201,15 +241,21 @@
             return;
         }
 
+        document.getElementById('a-base-output').innerHTML = aBase;
+        document.getElementById('b-base-output').innerHTML = bBase;
+
         try {
-            var a = F.convert(document.getElementById('a-fixed').value, aBase);
-            var b = F.convert(document.getElementById('b-fixed').value, bBase);
+            a = F.convert(document.getElementById('a-fixed').value, aBase);
+            b = F.convert(document.getElementById('b-fixed').value, bBase);
         } catch(e) {
             return;
         }
 
-        var op = document.getElementById('op').value;
+        op = document.getElementById('op').value;
+        recalculate();
+    }
 
+    function recalculate() {
         var r;
         switch(op) {
             case '+':
@@ -242,21 +288,26 @@
         var c = document.getElementById(prefix + '-structure');
         c.innerHTML = '';
 
+        var i = 0;
+
         var n;
         for(var s = 0; s < F.structure.sign; s++) {
             n = document.createElement('span');
+            n.setAttribute('data-bit', i++);
             n.className = 'bit sign';
             c.appendChild(n);
         }
 
         for(var e = 0; e < F.structure.exponent; e++) {
             n = document.createElement('span');
+            n.setAttribute('data-bit', i++);
             n.className = 'bit exp';
             c.appendChild(n);
         }
 
         for(var m = 0; m < F.structure.mantissa; m++) {
             n = document.createElement('span');
+            n.setAttribute('data-bit', i++);
             n.className = 'bit mantissa';
             c.appendChild(n);
         }
@@ -270,11 +321,12 @@
             c.childNodes.item(i).classList.remove('zero');
             c.childNodes.item(i).classList.remove('one');
             c.childNodes.item(i).classList.add(a[i] == 1 ? 'one' : 'zero');
+            c.childNodes.item(i).innerHTML = a[i];
         }
 
     }
 
-    recalculate();
+    reparse();
 </script>
 
 </body>

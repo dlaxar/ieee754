@@ -165,6 +165,10 @@
         return this.k + decimal;
     };
 
+    BinaryFloatSystem.prototype.dexcessify = function(decimal) {
+        return decimal - this.k;
+    };
+
     BinaryFloatSystem.intToBinary = function(decimal, width) {
         var memo = new Array(width);
         memo.fill(0);
@@ -190,6 +194,14 @@
         this.exponent = exponent;
     }
 
+    BinaryFloatNumber.createByArray = function(system, a) {
+        var sign = a[0];
+        var exp = system.dexcessify(parseInt(a.slice(1, system.structure.exponent+1).join(''), 2));
+        var mantissa = a.slice(system.structure.exponent+1);
+
+        return new BinaryFloatNumber(system, sign, mantissa, exp);
+    };
+
     BinaryFloatNumber.createByRoundingWithChecks = function(system, sign, explicitMantissa, exponent) {
         if (exponent > system.eMax) {
             return BinaryFloatNumber.getInfinity(system, sign);
@@ -202,6 +214,9 @@
                 for(var i = 0; i < deltaExp - 1; i++) {
                     mantissaImplicit.unshift(0);
                 }
+
+                // todo emin-1 is passed as exponent although, the acutal value to compute (especially calculations) with is emin. check if this works!
+
 
                 return BinaryFloatNumber.createByRounding(system, sign, mantissaImplicit, exp);
 
