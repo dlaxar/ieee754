@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>IEEE 754</title>
+    <script src="src/ieee.js"></script>
+
+    <style>
+        * {
+            font-family: monospace;
+        }
+
+        header {
+            font-size: 200%;
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .number {
+            font-size: 200%;
+            width: 45%;
+            float: left;
+            text-align: center;
+        }
+
+        .number.wide {
+            width: 100%;
+            clear: both;
+        }
+
+        .operator {
+            float: left;
+            width: 10%;
+            text-align: center;
+        }
+
+        .number label{
+            padding-right: 20px;
+        }
+
+        .number .structure {
+            overflow: hidden;
+            display: inline-block;
+        }
+
+        .number .structure .bit {
+            display: block;
+            float: left;
+        }
+
+        .number .structure .bit.sign {
+            background-color: darkseagreen;
+        }
+
+        .number .structure .bit.exp {
+            background-color: lightcoral;
+        }
+
+        .number .structure .bit.mantissa {
+            background-color: lavender;
+        }
+
+        .number .structure .bit.one:after {
+            content: '1';
+        }
+        .number .structure .bit.zero:after {
+            content: '0';
+        }
+
+
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>IEEE 754 System</h1>
+    <div class="system">
+        <form id="form-system">F(2, <input type="number" min="1" id="p" value="11">, <input type="number" id="min" value="-14">, <input type="number" id="max" value="15">, <select id="denorm"><option>true</option><option>false</option></select>)</form>
+    </div>
+</header>
+
+<section class="number" id="a">
+    <form id="form-a">
+        <label for="a-base-exp">Exponent for A:</label>2<sup><input type="number" min="1" value="1" id="a-base-exp"></sup><br>
+        <label for="a-fixed">A:</label>(<input type="text" id="a-fixed" value="0">) <sub><span id="a-base-output"></span></sub>
+    </form>
+
+    <div id="a-structure" class="structure"></div>
+</section>
+
+<section class="operator" id="operator">
+    <form action="form-op">
+        <select name="opcode" id="op">
+            <option value="+">PLUS</option>
+            <option value="-">MINUS</option>
+            <option value="/">DIVIDE</option>
+            <option value="*">MULTIPLY</option>
+        </select>
+    </form>
+</section>
+
+<section class="number" id="b">
+    <form id="form-b">
+        <label for="b-base-exp">Exponent for B:</label>2<sup><input type="number" min="1" value="1" id="b-base-exp"></sup><br>
+        <label for="b-fixed">B:</label>(<input type="text" id="b-fixed" value="0">) <sub><span id="b-base-output"></span></sub>
+    </form>
+
+    <div id="b-structure" class="structure"></div>
+</section>
+
+<section class="number wide" id="result">
+
+    <div id="result-structure" class="structure"></div>
+</section>
+
+<script>
+    var F = new window.BinaryFloatSystem(11, -14, 15, true, {
+        logLevel: Logger.DEBUG
+    });
+//    var a = F.convert('0.0014BB2A8', 16);
+//    var b = F.convert('-0.025764', 8);
+
+    function taskA() {
+        var a = F.convert('0.0014BB2A8', 16);
+        var b = F.convert('-0.025764', 8);
+
+        console.log((a.plus(b)).toString());
+        console.log((b.minus(a)).toString());
+    }
+
+    function taskB() {
+        var a = F.convert('-100.10110111', 2);
+        var b = F.convert('0.00000000010010011000', 2);
+        var c = F.convert('-11110.110000', 2);
+
+        console.log((a.times(b)).toString());
+        console.log((a.divide(c)).toString());
+    }
+
+    function taskC() {
+        var a = F.convert('0.00000000000101', 2);
+        var b = F.convert('0.000011110011101', 2);
+        var c = F.convert('-1000000000000000.0', 2);
+        var d = F.convert('0.0000000011000101100', 2);
+
+        console.log((a.times(b)).toString()); // todo
+        console.log((b.plus(d)).toString()); // todo
+        console.log((a.divide(c)).toString()); // todo denorm possible?
+    }
+
+    taskA();
+    taskB();
+    taskC();
+</script>
+
+<script>
+    var t;
+    document.getElementById('form-system').onkeyup =function() {
+        if(t) {
+            clearTimeout(t);
+        }
+        t = setTimeout(recalculate, 200);
+    };
+
+    document.getElementById('form-system').onchange = recalculate;
+
+    var numbersContainers = document.getElementsByClassName('number');
+    for(var i = 0; i < numbersContainers.length; i++) {
+        numbersContainers.item(i).onkeyup = recalculate;
+    }
+
+    function recalculate() {
+        console.log('calc');
+        clearTimeout(t);
+        var p = parseInt(document.getElementById('p').value);
+        if(isNaN(p) || p < 1) {
+            return;
+        }
+
+        var emin = parseInt(document.getElementById('min').value);
+        if(isNaN(emin)) {
+            return;
+        }
+
+        var emax = parseInt(document.getElementById('max').value);
+        if(isNaN(emax) || emin > emax) {
+            return;
+        }
+
+        var denorm = document.getElementById('denorm').value == 'true';
+
+        var F = new window.BinaryFloatSystem(p, emin, emax, denorm, {
+            logLevel: Logger.DEBUG // todo UI
+        });
+
+        var aBase = Math.pow(2, parseInt(document.getElementById('a-base-exp').value));
+        var bBase = Math.pow(2, parseInt(document.getElementById('b-base-exp').value));
+
+        if(isNaN(aBase) || isNaN(bBase)) {
+            return;
+        }
+
+        try {
+            var a = F.convert(document.getElementById('a-fixed').value, aBase);
+            var b = F.convert(document.getElementById('b-fixed').value, bBase);
+        } catch(e) {
+            return;
+        }
+
+        var op = document.getElementById('op').value;
+
+        var r;
+        switch(op) {
+            case '+':
+                r = a.plus(b);
+                break;
+
+            case '-':
+                r = a.minus(b);
+                break;
+
+            case '*':
+                r = a.times(b);
+                break;
+
+            case '/':
+                r = a.divide(b);
+                break;
+        }
+
+        rebuildStructure(F, 'a');
+        rebuildStructure(F, 'b');
+        rebuildStructure(F, 'result');
+
+        fillStructure(a, 'a');
+        fillStructure(b, 'b');
+        fillStructure(r, 'result');
+    }
+
+    function rebuildStructure(F, prefix) {
+        var c = document.getElementById(prefix + '-structure');
+        c.innerHTML = '';
+
+        var n;
+        for(var s = 0; s < F.structure.sign; s++) {
+            n = document.createElement('span');
+            n.className = 'bit sign';
+            c.appendChild(n);
+        }
+
+        for(var e = 0; e < F.structure.exponent; e++) {
+            n = document.createElement('span');
+            n.className = 'bit exp';
+            c.appendChild(n);
+        }
+
+        for(var m = 0; m < F.structure.mantissa; m++) {
+            n = document.createElement('span');
+            n.className = 'bit mantissa';
+            c.appendChild(n);
+        }
+    }
+
+    function fillStructure(n, prefix) {
+        var c = document.getElementById(prefix + '-structure');
+        var a = n.toArray();
+
+        for(var i = 0; i < c.childNodes.length; i++) {
+            c.childNodes.item(i).classList.remove('zero');
+            c.childNodes.item(i).classList.remove('one');
+            c.childNodes.item(i).classList.add(a[i] == 1 ? 'one' : 'zero');
+        }
+
+    }
+
+    recalculate();
+</script>
+
+</body>
+</html>
