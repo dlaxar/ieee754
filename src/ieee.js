@@ -317,12 +317,7 @@
                 result.unshift(carry);
             }
 
-            if (resultExp > this.system.eMax) {
-                return BinaryFloatNumber.getInfinity(this, sign);
-            } else {
-                result.shift();
-                return BinaryFloatNumber.createByRounding(this.system, this.sign, result, resultExp);
-            }
+            return BinaryFloatNumber.createByRoundingWithChecks(this.system, this.sign, result, resultExp);
         } else if (b.sign == 1 && aB.lowerThan(this)) {
             x = this.minus(aB);
         } else if(b.sign == 1 && aB.greaterThan(this)) {

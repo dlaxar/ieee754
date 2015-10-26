@@ -118,13 +118,12 @@
     var F = new window.BinaryFloatSystem(11, -14, 15, true, {
         logLevel: Logger.DEBUG
     });
-//    var a = F.convert('0.0014BB2A8', 16);
-//    var b = F.convert('-0.025764', 8);
 
     function taskA() {
         var a = F.convert('0.0014BB2A8', 16);
         var b = F.convert('-0.025764', 8);
 
+        console.log('Task A');
         console.log((a.plus(b)).toString());
         console.log((b.minus(a)).toString());
     }
@@ -134,6 +133,7 @@
         var b = F.convert('0.00000000010010011000', 2);
         var c = F.convert('-11110.110000', 2);
 
+        console.log('Task B');
         console.log((a.times(b)).toString());
         console.log((a.divide(c)).toString());
     }
@@ -144,6 +144,7 @@
         var c = F.convert('-1000000000000000.0', 2);
         var d = F.convert('0.0000000011000101100', 2);
 
+        console.log('Task C');
         console.log((a.times(b)).toString()); // todo
         console.log((b.plus(d)).toString()); // todo
         console.log((a.divide(c)).toString()); // todo denorm possible?
@@ -171,7 +172,6 @@
     }
 
     function recalculate() {
-        console.log('calc');
         clearTimeout(t);
         var p = parseInt(document.getElementById('p').value);
         if(isNaN(p) || p < 1) {
