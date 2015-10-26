@@ -295,6 +295,14 @@
         return new BinaryFloatNumber(system, sign, mantissa, system.eMax + 1);
     };
 
+    /**
+     * This method returns the exponent that should be used to compute
+     * e.g. if the exponent is eMin - 1 this method will return eMin
+     */
+    BinaryFloatNumber.prototype.getExponent = function() {
+        return Math.max(this.system.eMin, this.exponent);
+    };
+
     BinaryFloatNumber.prototype.getImplicitBit = function() {
         return (this.exponent >= this.system.eMin) ? 1 : 0;
     };
@@ -324,7 +332,7 @@
             }
             result.push((stickyA || stickyB) ? 1 : 0);
 
-            var resultExp = Math.max(this.exponent, b.exponent);
+            var resultExp = Math.max(this.getExponent(), b.getExponent());
 
             // overflow
             if(carry > 0) {
@@ -387,7 +395,7 @@
             }
             result.push(stickyA || stickyB ? 1 : 0);
 
-            var resultExp = Math.max(this.exponent, b.exponent);
+            var resultExp = Math.max(this.getExponent(), b.getExponent());
 
             if(carry > 0) {
                 log('There was an overflow while subtracting ((' + this.toString() + ') - (' + b.toString() + '))', Logger.WARN);
@@ -518,7 +526,7 @@
     };
 
     BinaryFloatNumber.prepareArithmetics = function(a, b) {
-        var deltaExp = a.exponent - b.exponent;
+        var deltaExp = a.getExponent() - b.getExponent();
 
         var mantissaA = a.mantissa.slice(0);
         var mantissaB = b.mantissa.slice(0);
@@ -604,9 +612,10 @@
 
     BinaryFloatNumber.prototype.toFixed = function(plus) {
         var mantissa = this.mantissa.slice(0, this.mantissa.lastIndexOf(1)+1);
-        var i;
-        if(this.exponent < 0) {
-            i = this.exponent;
+        var i, exponent = this.getExponent();
+
+        if(exponent < 0) {
+            i = exponent;
             mantissa.unshift(this.getImplicitBit());
             i++;
 
@@ -614,17 +623,17 @@
                 mantissa.unshift(0)
             }
             mantissa.unshift('.');
-        } else if(this.exponent == 0) {
+        } else if(exponent == 0) {
             mantissa.unshift('.');
             mantissa.unshift(this.getImplicitBit());
         } else {
-            if(this.exponent > mantissa.length) {
-                for(i = this.exponent - mantissa.length; i > 0; i--) {
+            if(exponent > mantissa.length) {
+                for(i = exponent - mantissa.length; i > 0; i--) {
                     mantissa.push(0);
                 }
             }
 
-            mantissa.splice(this.exponent, 0, '.');
+            mantissa.splice(exponent, 0, '.');
             mantissa.unshift(this.getImplicitBit());
         }
 
