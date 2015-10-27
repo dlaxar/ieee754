@@ -175,7 +175,7 @@
                 return BinaryFloatNumber.createByRounding(this, sign, mantissaImplicit, exp);
 
             } else {
-                return BinaryFloatNumber.getZero(system, sign);
+                return BinaryFloatNumber.getZero(this, sign);
             }
 
         // exponent too big
