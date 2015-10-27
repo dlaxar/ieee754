@@ -449,6 +449,16 @@
                 result.unshift(carry);
             }
 
+            var significant = result.indexOf(1);
+            if(significant < 0) {
+                resultExp = this.system.eMin - 1;
+            } else {
+                resultExp = resultExp - significant;
+                for(; significant > 0; significant--) {
+                    result.shift();
+                }
+            }
+
             return BinaryFloatNumber.createByRoundingWithChecks(this.system, this.sign, result, resultExp);
         } else if (b.sign == 1 && aB.lowerThan(this)) {
             x = this.minus(aB);
@@ -465,7 +475,7 @@
             x.sign = (x.sign == 1) ? 0 : 1;
         } else if(this.sign == 1 && aA.lowerThan(b)) {
             x = b.minus(aA);
-        } else if(b.sign == 1 && this.equals(aB)) {
+        } else if(b.sign == 1 && aA.equals(aB) || this.sign == 1 && aA.equals(aB)) {
             x = BinaryFloatNumber.getZero(this.system, 0);
         }
 
@@ -512,7 +522,7 @@
 
             var significant = result.indexOf(1);
             if(significant < 0) {
-                resultExp = this.eMin - 1;
+                resultExp = this.system.eMin - 1;
             } else {
                 resultExp = resultExp - significant;
                 for(; significant > 0; significant--) {
