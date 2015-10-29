@@ -499,7 +499,7 @@
             var carry = 0;
             var result = new Array(mA.length);
             for(var i = mA.length - 1; i >= 0; i--) {
-                if(mB[i] + carry == 0) {
+                if((mB[i] + carry)%2 == 0) {
                     result[i] = mA[i];
                 } else if(mA[i] == mB[i] + carry) {
                     result[i] = 0;
@@ -679,17 +679,20 @@
             }
         }
 
-        var mA = mantissaA.slice(0, a.system.structure.mantissa);
-        mA.push(mantissaA[a.system.structure.mantissa] || 0);
-        mA.push(mantissaA[a.system.structure.mantissa+1] || 0);
-        var stickyA = mantissaA.slice(a.system.structure.mantissa+2).reduce(function(memo, current) {
+        // add one because of the now explicit bit
+        var mantissaLength = a.system.structure.mantissa+1;
+
+        var mA = mantissaA.slice(0, mantissaLength);
+        mA.push(mantissaA[mantissaLength] || 0);
+        mA.push(mantissaA[mantissaLength+1] || 0);
+        var stickyA = mantissaA.slice(mantissaLength+2).reduce(function(memo, current) {
             return memo || current == 1;
         }, false);
 
-        var mB = mantissaB.slice(0, a.system.structure.mantissa);
-        mB.push(mantissaB[a.system.structure.mantissa] || 0);
-        mB.push(mantissaB[a.system.structure.mantissa+1] || 0);
-        var stickyB = mantissaB.slice(a.system.structure.mantissa+2).reduce(function(memo, current) {
+        var mB = mantissaB.slice(0, mantissaLength);
+        mB.push(mantissaB[mantissaLength] || 0);
+        mB.push(mantissaB[mantissaLength+1] || 0);
+        var stickyB = mantissaB.slice(mantissaLength+2).reduce(function(memo, current) {
             return memo || current == 1;
         }, false);
 
