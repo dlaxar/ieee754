@@ -80,7 +80,27 @@
 <header>
     <h1>IEEE 754 System</h1>
     <div class="system">
-        <form id="form-system">F(2, <input type="number" min="1" id="p" value="11">, <input type="number" id="min" value="-14">, <input type="number" id="max" value="15">, <select id="denorm"><option>true</option><option>false</option></select>)</form>
+        <form id="form-system">
+            <p>F(2, <input type="number" min="1" id="p" value="11">, <input type="number" id="min" value="-14">, <input type="number" id="max" value="15">, <select id="denorm"><option>true</option><option>false</option></select>)</p>
+            <p>Primary Rounding: <select name="rounding-primary" id="rounding-primary">
+                <option value="rtn">Round To Nearest</option>
+                <option value="rte">Round To Even</option>
+                <option value="rto">Round To Odd</option>
+                <option value="rtpi">Round To Positive Infinity</option>
+                <option value="rtni">Round To Negative Infinity</option>
+                <option value="raz">Round Away From Zero</option>
+                <option value="truncate">Round Toward Zero</option>
+            </select>
+                Secondary Rounding: <select name="rounding-secondary" id="rounding-secondary">
+                    <option value="rte">Round To Even</option>
+                    <option value="rto">Round To Odd</option>
+                    <option value="rtpi">Round To Positive Infinity</option>
+                    <option value="rtni">Round To Negative Infinity</option>
+                    <option value="raz">Round Away From Zero</option>
+                    <option value="truncate">Round Toward Zero</option>
+                </select>
+            </p>
+        </form>
     </div>
 </header>
 
@@ -230,7 +250,7 @@
 
         var denorm = document.getElementById('denorm').value == 'true';
 
-        F = new window.BinaryFloatSystem(p, emin, emax, denorm, {
+        F = new window.BinaryFloatSystem(p, emin, emax, denorm, [document.getElementById('rounding-primary').value, document.getElementById('rounding-secondary').value], {
             logLevel: Logger.DEBUG // todo UI
         });
 

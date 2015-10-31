@@ -35,7 +35,7 @@
      * @param options
      * @constructor
      */
-    function BinaryFloatSystem(p, eMin, eMax, denorm, options) {
+    function BinaryFloatSystem(p, eMin, eMax, denorm, rounds, options) {
         this.p = p;
         this.eMin = eMin;
         this.eMax = eMax;
@@ -46,6 +46,7 @@
             exponent: -1,
             mantissa: -1
         };
+        this.roundingMethods = rounds;
 
         this.options = options || {
                 logLevel: Logger.OFF
@@ -55,6 +56,129 @@
 
         this.compute();
     }
+
+    BinaryFloatSystem.ROUND_METHODS = {
+        // round to nearest
+        rtn: function(next, sign, mantissa, exponent, guard, round, sticky) {
+            if(guard == 1) {
+                var increase = false;
+                if(round == 1 || sticky) {
+
+                    // add 1
+                    increase = true;
+                } else if(round == 0 && !sticky) { // undefined behaviour -> pass to next method
+                    return next.apply(this, Array.prototype.slice.call(arguments, 1));
+                }
+
+                if(increase) { BinaryFloatSystem.addOneToMantissa(mantissa, exponent); }
+            }
+
+            return new BinaryFloatNumber(this, sign, mantissa, exponent);
+        },
+
+        // round to even
+        rte: function(next, sign, mantissa, exponent, guard, round, sticky) {
+            if(guard == 1 || round == 1 || sticky) {
+                if(mantissa[mantissa.length - 1] == 0) {
+                    return new BinaryFloatNumber(this, sign, mantissa, exponent);
+                } else {
+                    exponent = BinaryFloatSystem.addOneToMantissa(mantissa, exponent);
+                }
+            }
+
+            return new BinaryFloatNumber(this, sign, mantissa, exponent);
+        },
+
+        // round to odd
+        rto: function(next, sign, mantissa, exponent, guard, round, sticky) {
+            if(guard == 1 || round == 1 || sticky) {
+                if(mantissa[mantissa.length - 1] == 1) {
+                    return new BinaryFloatNumber(this, sign, mantissa, exponent);
+                } else {
+                    exponent = BinaryFloatSystem.addOneToMantissa(mantissa, exponent);
+                }
+            }
+
+            return new BinaryFloatNumber(this, sign, mantissa, exponent);
+        },
+
+        // round to positive infinity
+        rtpi: function(next, sign, mantissa, exponent, guard, round, sticky) {
+            if(guard == 1 || round == 1 || sticky) {
+                if(sign == 0) { // positive number
+                    exponent = BinaryFloatSystem.addOneToMantissa(mantissa, exponent);
+                }
+                // since negative numbers are ignored they are truncated
+            }
+
+            return new BinaryFloatNumber(this, sign, mantissa, exponent);
+        },
+
+        // round to negative infinity
+        rtni: function(next, sign, mantissa, exponent, guard, round, sticky) {
+            if(guard == 1 || round == 1 || sticky) {
+                if(sign == 1) { // negative number
+                    exponent = BinaryFloatSystem.addOneToMantissa(mantissa, exponent);
+                }
+                // since positive numbers are ignored they are truncated
+            }
+
+            return new BinaryFloatNumber(this, sign, mantissa, exponent);
+        },
+
+        // round away from zero
+        raz: function(next, sign, mantissa, exponent, guard, round, sticky) {
+            if(guard == 1 || round == 1 || sticky) {
+                exponent = BinaryFloatSystem.addOneToMantissa(mantissa, exponent);
+            }
+
+            return new BinaryFloatNumber(this, sign, mantissa, exponent);
+        },
+
+        truncate: function(next, sign, mantissa, exponent, guard, round, sticky) {
+            return new BinaryFloatNumber(this, sign, mantissa, exponent);
+        }
+    };
+
+    /**
+     * This is a simplified addition logic. It adds one to the given array (mantissa)
+     * and increases the exponent if an overflow occurs. It also checks for a system overflow
+     * (exponent too big for system) and modifies the mantissa to an all-zero mantissa and returns eMax+1 as exponent
+     * which may then function as exponent and mantissa for negativ or positive infinity based on the
+     * context this function was called from.
+     *
+     * Note: the mantissa in the source context is modified when this function is called. The new exponent
+     * will be returned
+     *
+     * @param {Number[]} mantissa
+     * @param {Number} exponent
+     * @returns {Number} exponent
+     */
+    BinaryFloatSystem.addOneToMantissa = function(mantissa, exponent) {
+        var carry = 1;
+        for (var i = mantissa.length - 1; i >= 0; i--) {
+            if (carry > 0) {
+                if (mantissa[i] == 0) {
+                    mantissa[i] = carry;
+                    carry = 0;
+                } else {
+                    mantissa[i] = 0;
+                }
+            }
+        }
+        if (carry > 0) {
+            log('Overflow at rounding. Need to increase exponent!', Logger.MATH);
+            exponent++;
+
+            // When exponent gets too big the number is +infinity. To do so the
+            // mantissa needs to be 0 (would be NaN otherwise).
+            if (exponent > this.eMax) {
+                exponent = this.eMax+1;
+                mantissa.fill(0);
+            }
+        }
+        return exponent;
+    };
 
     /**
      * Compute the parameters for the system. Intended for internal use
@@ -204,6 +328,22 @@
         return decimal - this.k;
     };
 
+    BinaryFloatSystem.prototype.composeRoundFunction = function() {
+        var fn = BinaryFloatSystem.ROUND_METHODS.truncate.bind(this, null);
+        for(var i = this.roundingMethods.length - 1; i >= 0; i--) {
+            fn = BinaryFloatSystem.ROUND_METHODS[this.roundingMethods[i]].bind(this, fn);
+        }
+        return fn;
+    };
+
+    BinaryFloatSystem.prototype.getRounderFunction = function() {
+        if(this.composedRounder) {
+            return this.composedRounder;
+        }
+
+        return this.composeRoundFunction();
+    };
+
     /**
      * Converts any decimal integer to binary with a given width
      *
@@ -330,47 +470,15 @@
             var apply = mantissa;
             apply.unshift(0, mantissa.length);
             finalMantissa.splice.apply(finalMantissa, apply);
+            return new BinaryFloatNumber(system, sign, finalMantissa, exponent);
         } else {
             finalMantissa = mantissa.slice(0, system.structure.mantissa);
             var guard = mantissa[system.structure.mantissa];
             var round = (mantissa.length < system.structure.mantissa + 1) ? mantissa[system.structure.mantissa + 1] : 0;
             var sticky = mantissa.lastIndexOf(1) > system.structure.mantissa+2;
 
-            // todo make rounding modular
-            if(guard == 1) {
-                var carry = 0;
-                if(round == 1 || sticky) {
-
-                    // add 1
-                    carry = 1;
-                } else if(round == 0 && !sticky) {
-                    carry = 1;
-                }
-
-                for(var i = finalMantissa.length - 1; i >= 0; i--) {
-                    if(carry > 0) {
-                        if(finalMantissa[i] == 0) {
-                            finalMantissa[i] = carry;
-                            carry = 0;
-                        } else {
-                            finalMantissa[i] = 0;
-                        }
-                    }
-                }
-                if(carry > 0) {
-                    log('Overflow at rounding. Need to increase exponent!', Logger.MATH);
-                    exponent++;
-
-                    // When exponent gets too big the number is +infinity. To do so the
-                    // mantissa needs to be 0 (would be NaN otherwise).
-                    if(exponent > system.eMax) {
-                        finalMantissa.fill(0);
-                    }
-                }
-            }
+            return system.getRounderFunction()(sign, finalMantissa, exponent, guard, round, !!sticky);
         }
-
-        return new BinaryFloatNumber(system, sign, finalMantissa, exponent);
     };
 
     /**
